@@ -150,6 +150,10 @@ python opencood/tools/run_batch_infer.py \
   --skip_task_if_success
 ```
 
+## License
+
+This repository uses a mixed license structure. UniTrans-original components are released for academic and non-commercial research use. Framework code adapted from OpenCOOD, HEAL, and STAMP remains subject to the corresponding upstream licenses. Please see `LICENSE` and `NOTICE` for details.
+
 ## Acknowledgements
 
-This repository builds on the OpenCOOD ecosystem and benefits from the codebases and experimental protocols of [HEAL](https://github.com/yifanlu0227/HEAL) and [STAMP](https://github.com/taco-group/STAMP). We sincerely thank the authors of these projects for their contributions to heterogeneous collaborative perception.
+This repository builds on the OpenCOOD ecosystem and benefits from the codebases and experimental protocols of [OpenCOOD](https://github.com/DerrickXuNu/OpenCOOD), [HEAL](https://github.com/yifanlu0227/HEAL), and [STAMP](https://github.com/taco-group/STAMP). We sincerely thank the authors of these projects for their contributions to heterogeneous collaborative perception.

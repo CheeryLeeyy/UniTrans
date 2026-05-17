@@ -1,0 +1,29 @@
+UniTrans Notice
+===============
+
+This repository contains the official implementation of UniTrans.
+
+Original UniTrans Contributions
+-------------------------------
+
+The core UniTrans components, including the modality-intrinsic representation
+pretraining pipeline, mapping-conditioned translator expert learning, and
+related UniTrans model code, were developed by the UniTrans authors.
+
+Third-Party Code and Acknowledgements
+-------------------------------------
+
+This repository builds upon or adapts framework components from the following
+projects:
+
+- OpenCOOD: https://github.com/DerrickXuNu/OpenCOOD
+  License: Academic Software License, UCLA Mobility Lab.
+
+- HEAL: https://github.com/yifanlu0227/HEAL
+  License: Academic Software License, UCLA Mobility Lab.
+
+- STAMP: https://github.com/taco-group/STAMP
+  License: MIT License, TACO-Group.
+
+The third-party components remain under their respective original licenses.
+Please refer to the upstream repositories for their full license texts.

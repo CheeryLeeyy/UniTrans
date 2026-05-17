@@ -1,0 +1,46 @@
+Mixed Academic and Third-Party License Notice
+
+Copyright (c) 2026 UniTrans authors.
+
+This repository contains the official implementation of UniTrans, including
+original UniTrans model components and framework code adapted from existing
+open-source collaborative perception projects.
+
+1. UniTrans-original components
+
+The UniTrans-original components, including the core UniTrans model design,
+training pipeline, and related implementation contributed by the UniTrans
+authors, are released for academic and non-commercial research use.
+
+Academic and nonprofit researchers are permitted to use, copy, modify, and
+create derivative works of these UniTrans-original components solely for
+educational or academic research purposes.
+
+Commercial use of the UniTrans-original components requires prior written
+permission from the UniTrans authors.
+
+2. Third-party framework components
+
+This repository includes or adapts framework code from OpenCOOD, HEAL, and
+STAMP. Such third-party components remain subject to their original licenses
+and copyright notices:
+
+- OpenCOOD: Academic Software License, UCLA Mobility Lab.
+- HEAL: Academic Software License, UCLA Mobility Lab.
+- STAMP: MIT License, TACO-Group.
+
+Users are responsible for complying with the applicable licenses of all
+third-party components. In particular, because this repository includes
+OpenCOOD/HEAL-derived framework code, use of the complete repository may be
+restricted to academic or nonprofit research purposes unless separate
+permission is obtained from the relevant rights holders.
+
+3. Disclaimer
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM,
+OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
