@@ -1,0 +1,2375 @@
+name: unitrans_30_modalities
+root_dir: "/dataset/OPV2V/train"
+validate_dir: "/dataset/OPV2V/validate"
+test_dir: "/dataset/OPV2V/test"
+
+yaml_parsers:
+  m4: "load_general_params"
+  m7: "load_general_params"
+  m2: "load_general_params"
+  m9: "load_general_params"
+  m5: "load_general_params"
+  m11: "load_general_params"
+  m12: "load_general_params"
+  m14: "load_general_params"
+  m15: "load_general_params"
+  m17: "load_general_params"
+  m6: "load_general_params"
+  m8: "load_general_params"
+  m10: "load_general_params"
+  m13: "load_general_params"
+  m16: "load_general_params"
+  m18: "load_general_params"
+  m19: "load_general_params"
+  m20: "load_general_params"
+  m24: "load_general_params"
+  m25: "load_general_params"
+  m26: "load_general_params"
+  m30: "load_general_params"
+  m31: "load_general_params"
+  m32: "load_general_params"
+  m1: "load_general_params"
+  m3: "load_general_params"
+  m36: "load_general_params"
+  m37: "load_general_params"
+  m38: "load_general_params"
+  m39: "load_general_params"
+
+
+
+train_params:
+  batch_size: &batch_size 8
+  epoches: 100
+  eval_freq: 4
+  save_freq: 4
+  max_cav: 5
+
+comm_range: 70
+input_source: ['lidar', 'camera', 'depth']
+label_type: 'lidar'
+cav_lidar_range: &cav_lidar [-51.2, -51.2, -3, 51.2, 51.2, 1]
+#cav_lidar_range: &cav_lidar [-102.4, -51.2, -3, 102.4, 51.2, 1]
+
+add_data_extension: ['bev_visibility.png']
+
+heter:
+  assignment_path: "opencood/logs/heter_modality_assign/opv2v_4modality.json"    ###############
+  ego_modality: &ego_modality "m4"
+  protocol_modality: &protocol_modality "m0"
+  mapping_dict:
+    m1: m1
+    m2: m2
+    m3: m3
+    m4: m4
+    m7: m7
+    m9: m9
+    m5: m5
+    m11: m11
+    m12: m12
+    m14: m14
+    m15: m15
+    m17: m17
+    m6: m6
+    m8: m8
+    m10: m10
+    m13: m13
+    m16: m16
+    m18: m18
+    m19: m19
+    m20: m20
+    m24: m24
+    m25: m25
+    m26: m26
+    m30: m30
+    m31: m31
+    m32: m32
+    m36: m36
+    m37: m37
+    m38: m38
+    m39: m39
+
+  ego_sample_weight:
+    m1: 6
+    m3: 6
+    m36: 6
+    m37: 6
+    m38: 6
+    m39: 6
+
+  neb_sample_weight:
+    m1: 2
+    m3: 2
+    m36: 2
+    m37: 2
+    m38: 2
+    m39: 2
+
+
+
+  modality_setting:
+    m4:
+      sensor_type: &sensor_type_m4 'lidar'
+      core_method: &core_method_m4 "point_pillar"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m4 [0.4, 0.4, 4]
+          max_points_per_voxel: 32
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m4 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m4 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m4 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m4
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m4
+    m7:
+      sensor_type: &sensor_type_m7 'lidar'
+      core_method: &core_method_m7 "point_pillar"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m7 [0.4, 0.4, 4]
+          max_points_per_voxel: 32
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m7 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m7 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m7 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m7
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m7
+    m2:
+      sensor_type: &sensor_type_m2 'lidar'
+      core_method: &core_method_m2 "second"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m2 [0.1, 0.1, 0.1]
+          max_points_per_voxel: 5
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m2 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m2 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m2 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m2
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m2
+    m9:
+      sensor_type: &sensor_type_m9 'lidar'
+      core_method: &core_method_m9 "second"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m9 [0.1, 0.1, 0.1]
+          max_points_per_voxel: 5
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m9 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m9 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m9 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m9
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m9
+    m5:
+      sensor_type: &sensor_type_m5 'lidar'
+      core_method: &core_method_m5 "voxel_net"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m5 [0.4, 0.4, 0.4]
+          max_points_per_voxel: 32
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m5 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size:  [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m5 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m5 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m5
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m5
+    m11:
+      sensor_type: &sensor_type_m11 'lidar'
+      core_method: &core_method_m11 "voxel_net"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m11 [0.4, 0.4, 0.4]
+          max_points_per_voxel: 32
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m11 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m11 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m11 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m11
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m11
+    m12:
+      sensor_type: &sensor_type_m12 'lidar'
+      core_method: &core_method_m12 "point_pillar"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m12 [0.8, 0.8, 4]
+          max_points_per_voxel: 32
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m12 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size:  [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m12 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m12 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m12
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m12
+    m14:
+      sensor_type: &sensor_type_m14 'lidar'
+      core_method: &core_method_m14 "point_pillar"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m14 [0.8, 0.8, 4]
+          max_points_per_voxel: 32
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m14 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m14 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m14 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m14
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m14
+    m15:
+      sensor_type: &sensor_type_m15 'lidar'
+      core_method: &core_method_m15 "second"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m15 [0.2, 0.2, 0.2]
+          max_points_per_voxel: 20
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m15 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m15 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m15 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m15
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m15
+    m17:
+      sensor_type: &sensor_type_m17 'lidar'
+      core_method: &core_method_m17 "second"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m17 [0.2, 0.2, 0.2]
+          max_points_per_voxel: 20
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m17 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m17 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m17 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m17
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m17
+    m6:
+      sensor_type: &sensor_type_m6 'lidar'
+      core_method: &core_method_m6 "point_pillar"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m6 [0.4, 0.4, 4]
+          max_points_per_voxel: 32
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m6 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size:  [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m6 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m6
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw
+    m8:
+      sensor_type: &sensor_type_m8 'lidar'
+      core_method: &core_method_m8 "second"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m8 [0.1, 0.1, 0.1]
+          max_points_per_voxel: 5
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m8 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size:  [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m8 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m8 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m8
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m8
+    m10:
+      sensor_type: &sensor_type_m10 'lidar'
+      core_method: &core_method_m10 "voxel_net"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m10 [0.4, 0.4, 0.4]
+          max_points_per_voxel: 32
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m10 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m10 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m10 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m10
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m10
+    m13:
+      sensor_type: &sensor_type_m13 'lidar'
+      core_method: &core_method_m13 "point_pillar"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m13 [0.8, 0.8, 4]
+          max_points_per_voxel: 32
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m13 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: &voxel_size [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m13 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m13 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m13
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m13
+    m16:
+      sensor_type: &sensor_type_m16 'lidar'
+      core_method: &core_method_m16 "second"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m16 [0.2, 0.2, 0.2]
+          max_points_per_voxel: 20
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m16 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m16 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m16 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m16
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m16
+    m24:
+      sensor_type: &sensor_type_m24 'lidar'
+      core_method: &core_method_m24 "second"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m24 [0.4, 0.4, 0.4]
+          max_points_per_voxel: 32
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m24 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m24 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m24 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m24
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m24
+    m25:
+      sensor_type: &sensor_type_m25 'lidar'
+      core_method: &core_method_m25 "second"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m25 [0.4, 0.4, 0.4]
+          max_points_per_voxel: 32
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m25 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m25 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m25 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m25
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m25
+    m26:
+      sensor_type: &sensor_type_m26 'lidar'
+      core_method: &core_method_m26 "second"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m26 [0.4, 0.4, 0.4]
+          max_points_per_voxel: 32
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m26 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m26 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m26 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m26
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m26
+    m18:
+      sensor_type: &sensor_type_m18 'lidar'
+      core_method: &core_method_m18 "point_pillar"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m18 [0.2, 0.2, 4]
+          max_points_per_voxel: 32
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m18 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m18 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m18 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m18
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m18
+    m19:
+      sensor_type: &sensor_type_m19 'lidar'
+      core_method: &core_method_m19 "point_pillar"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m19 [0.2, 0.2, 4]
+          max_points_per_voxel: 32
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m19 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m19 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m19 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m19
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m19
+    m20:
+      sensor_type: &sensor_type_m20 'lidar'
+      core_method: &core_method_m20 "point_pillar"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m20 [0.2, 0.2, 4]
+          max_points_per_voxel: 32
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m20 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m20 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m20 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m20
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m20
+    m30:
+      sensor_type: &sensor_type_m30 'lidar'
+      core_method: &core_method_m30 "voxel_net"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m30 [0.8, 0.8, 0.4]
+          max_points_per_voxel: 32
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m30 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m30 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m30 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m30
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m30
+    m31:
+      sensor_type: &sensor_type_m31 'lidar'
+      core_method: &core_method_m31 "voxel_net"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m31 [0.8, 0.8, 0.4]
+          max_points_per_voxel: 32
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m31 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m31 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m31 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m31
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m31
+    m32:
+      sensor_type: &sensor_type_m32 'lidar'
+      core_method: &core_method_m32 "voxel_net"
+
+      # lidar requires preprocess
+      preprocess:
+        # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
+        core_method: 'SpVoxelPreprocessor'
+        args:
+          voxel_size: &voxel_size_m32 [0.8, 0.8, 0.4]
+          max_points_per_voxel: 32
+          max_voxel_train: 32000
+          max_voxel_test: 70000
+        # lidar range for each individual cav.
+        cav_lidar_range: &cav_lidar_m32 [-51.2, -51.2, -3, 51.2, 51.2, 1]
+
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m32 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m32 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m32
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m32
+    m1:
+      sensor_type: &sensor_type_m1 'camera'
+      core_method: &core_method_m1 "lift_splat_shoot"
+
+      grid_conf: &grid_conf_m1
+        xbound: [-51.2, 51.2, 0.4]   # Limit the range of the x direction and divide the grids
+        ybound: [-51.2, 51.2, 0.4]   # Limit the range of the y direction and divide the grids
+        zbound: [-10, 10, 20.0]   # Limit the range of the z direction and divide the grids
+        ddiscr: [2, 50, 48]
+        mode: 'LID'
+      data_aug_conf: &data_aug_conf_m1
+        resize_lim: [0.65, 0.7]
+        final_dim: [384, 512]
+        rot_lim: [-3.6, 3.6]
+        H: 600
+        W: 800
+        rand_flip: False
+        bot_pct_lim: [0.0, 0.05]
+        cams: ['camera0', 'camera1', 'camera2', 'camera3']
+        Ncams: 4
+
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m1 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m1 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m1
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m1
+    m3:
+      sensor_type: &sensor_type_m3 'camera'
+      core_method: &core_method_m3 "lift_splat_shoot"
+
+      grid_conf: &grid_conf_m3
+        xbound: [-51.2, 51.2, 0.4]   # Limit the range of the x direction and divide the grids
+        ybound: [-51.2, 51.2, 0.4]   # Limit the range of the y direction and divide the grids
+        zbound: [-10, 10, 20.0]   # Limit the range of the z direction and divide the grids
+        ddiscr: [2, 50, 48]
+        mode: 'LID'
+      data_aug_conf: &data_aug_conf_m3
+        resize_lim: [0.65, 0.7]
+        final_dim: [384, 512]
+        rot_lim: [-3.6, 3.6]
+        H: 600
+        W: 800
+        rand_flip: False
+        bot_pct_lim: [0.0, 0.05]
+        cams: ['camera0', 'camera1', 'camera2', 'camera3']
+        Ncams: 4
+
+      # anchor box related
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m3 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m3 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m3
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m3
+    m36:
+      sensor_type: &sensor_type_m36 'camera'
+      core_method: &core_method_m36 "lift_splat_shoot"
+
+      grid_conf: &grid_conf_m36
+        xbound: [-51.2, 51.2, 0.4]   # Limit the range of the x direction and divide the grids
+        ybound: [-51.2, 51.2, 0.4]   # Limit the range of the y direction and divide the grids
+        zbound: [-10, 10, 20.0]   # Limit the range of the z direction and divide the grids
+        ddiscr: [2, 50, 48]
+        mode: 'LID'
+      data_aug_conf: &data_aug_conf_m36
+        resize_lim: [0.65, 0.7]
+        final_dim: [384, 512]
+        rot_lim: [-3.6, 3.6]
+        H: 600
+        W: 800
+        rand_flip: False
+        bot_pct_lim: [0.0, 0.05]
+        cams: ['camera0', 'camera1', 'camera2', 'camera3']
+        Ncams: 4
+
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m36 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m36 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m36
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m36
+    m37:
+      sensor_type: &sensor_type_m37 'camera'
+      core_method: &core_method_m37 "lift_splat_shoot"
+
+      grid_conf: &grid_conf_m37
+        xbound: [-51.2, 51.2, 0.4]   # Limit the range of the x direction and divide the grids
+        ybound: [-51.2, 51.2, 0.4]   # Limit the range of the y direction and divide the grids
+        zbound: [-10, 10, 20.0]   # Limit the range of the z direction and divide the grids
+        ddiscr: [2, 50, 48]
+        mode: 'LID'
+      data_aug_conf: &data_aug_conf_m37
+        resize_lim: [0.65, 0.7]
+        final_dim: [384, 512]
+        rot_lim: [-3.6, 3.6]
+        H: 600
+        W: 800
+        rand_flip: False
+        bot_pct_lim: [0.0, 0.05]
+        cams: ['camera0', 'camera1', 'camera2', 'camera3']
+        Ncams: 4
+
+      # anchor box related
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m37 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m37 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m37
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m37
+    m38:
+      sensor_type: &sensor_type_m38 'camera'
+      core_method: &core_method_m38 "lift_splat_shoot"
+
+      grid_conf: &grid_conf_m38
+        xbound: [-51.2, 51.2, 0.4]   # Limit the range of the x direction and divide the grids
+        ybound: [-51.2, 51.2, 0.4]   # Limit the range of the y direction and divide the grids
+        zbound: [-10, 10, 20.0]   # Limit the range of the z direction and divide the grids
+        ddiscr: [2, 50, 48]
+        mode: 'LID'
+      data_aug_conf: &data_aug_conf_m38
+        resize_lim: [0.65, 0.7]
+        final_dim: [384, 512]
+        rot_lim: [-3.6, 3.6]
+        H: 600
+        W: 800
+        rand_flip: False
+        bot_pct_lim: [0.0, 0.05]
+        cams: ['camera0', 'camera1', 'camera2', 'camera3']
+        Ncams: 4
+
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m38 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m38 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m38
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m38
+    m39:
+      sensor_type: &sensor_type_m39 'camera'
+      core_method: &core_method_m39 "lift_splat_shoot"
+
+      grid_conf: &grid_conf_m39
+        xbound: [-51.2, 51.2, 0.4]   # Limit the range of the x direction and divide the grids
+        ybound: [-51.2, 51.2, 0.4]   # Limit the range of the y direction and divide the grids
+        zbound: [-10, 10, 20.0]   # Limit the range of the z direction and divide the grids
+        ddiscr: [2, 50, 48]
+        mode: 'LID'
+      data_aug_conf: &data_aug_conf_m39
+        resize_lim: [0.65, 0.7]
+        final_dim: [384, 512]
+        rot_lim: [-3.6, 3.6]
+        H: 600
+        W: 800
+        rand_flip: False
+        bot_pct_lim: [0.0, 0.05]
+        cams: ['camera0', 'camera1', 'camera2', 'camera3']
+        Ncams: 4
+
+      # anchor box related
+      postprocess:
+        core_method: 'VoxelPostprocessor' # VoxelPostprocessor, BevPostprocessor supported
+        gt_range: *cav_lidar
+        voxel_size: [0.4, 0.4, 4]
+        anchor_args:
+          cav_lidar_range: *cav_lidar
+          l: 3.9
+          w: 1.6
+          h: 1.56
+          r: &anchor_yaw_m39 [0, 90]
+          feature_stride: 2
+          num: &anchor_num_m39 2
+        target_args:
+          pos_threshold: 0.6
+          neg_threshold: 0.45
+          score_threshold: 0.2
+        order: 'hwl' # hwl or lwh
+        max_num: 150 # maximum number of objects in a single frame. use this number to make sure different frames has the same dimension in the same batch
+        nms_thresh: 0.15
+        dir_args: &dir_args_m39
+          dir_offset: 0.7853
+          num_bins: 2
+          anchor_yaw: *anchor_yaw_m39
+
+
+fusion:
+  core_method: 'intermediatehetermoe'
+  dataset: 'opv2v'
+  args:
+    proj_first: false
+    grid_conf: None # place-holder
+    data_aug_conf: None # place-holder
+    mode: train_converter_single      # train_moe
+
+# model related
+model:
+  core_method: collab_unitrans
+  args:
+    stage: train_converter_single
+    crop_to_visible: true
+    supervise_single: true
+    ego_modality: *ego_modality
+    protocol_modality: *protocol_modality
+    heterogeneous: true
+
+#    ignored_modality: ['m2', 'm4', 'm5', 'm6', 'm7', 'm8', 'm9', 'm10', 'm11', 'm12', 'm13', 'm14', 'm15', 'm16', 'm17', 'm18', 'm19', 'm20', 'm21', 'm22', 'm23', 'm24', 'm25', 'm26', 'm27', 'm28', 'm29', 'm30', 'm31', 'm32', 'm33']
+#    ignored_modality: ['m13']
+    ignored_modality: ['m7', 'm13', 'm17', 'm31', 'm36', 'm39']
+    intrinsic:
+      center_momentum: 0.95
+      in_ch: 64
+      embed_dim: &code_embed 4
+      gram_dim: 128
+      dropout: 0.05
+      gram_down: 4  # spatial downsample factor before Gram
+    converter:
+      type: unitrans
+      top_k: &top_k 3
+      depth: 2
+      in_dim: 64
+      code_dim: *code_embed
+      n_experts: 8
+      n_heads: 4
+      window_size: 8
+      mlp_ratio: 4
+      dropout: 0.01
+      use_adaLN_modulation: false
+      out_conv: true
+
+
+    m4:
+      core_method: *core_method_m4
+      sensor_type: *sensor_type_m4
+      lidar_range: *cav_lidar_m4
+
+      encoder_args:
+        voxel_size: *voxel_size_m4
+        lidar_range: *cav_lidar_m4
+        pillar_vfe:
+          use_norm: true
+          with_distance: false
+          use_absolute_xyz: true
+          num_filters: [64]
+        point_pillar_scatter:
+          num_features: 64
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [2]
+        num_filters: [64]
+
+      aligner_args:
+        core_method: identity
+
+      fusion_method: pyramid
+
+      fusion_backbone:
+        resnext: true
+        layer_nums: [3, 5, 8]
+        layer_strides: [1, 2, 2]
+        num_filters: [64, 128, 256]
+        upsample_strides: [1, 2, 4]
+        num_upsample_filter: [128, 128, 128]
+        anchor_number: *anchor_num_m12
+
+      shrink_header:
+        kernal_size: [ 3 ]
+        stride: [ 1 ]
+        padding: [ 1 ]
+        dim: [ 256 ]
+        input_dim: 384 # 128 * 3
+
+      in_head: 256
+      anchor_number: *anchor_num_m4
+      dir_args: *dir_args_m4
+
+    m7:
+      core_method: *core_method_m7
+      sensor_type: *sensor_type_m7
+      lidar_range: *cav_lidar_m7
+
+      encoder_args:
+        voxel_size: *voxel_size_m7
+        lidar_range: *cav_lidar_m7
+        pillar_vfe:
+          use_norm: true
+          with_distance: false
+          use_absolute_xyz: true
+          num_filters: [64, 64, 64]
+        point_pillar_scatter:
+          num_features: 64
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [2]
+        num_filters: [64]
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m7
+      dir_args: *dir_args_m7
+
+    m2:
+      core_method: *core_method_m2
+      sensor_type: *sensor_type_m2
+      lidar_range: *cav_lidar_m2
+
+      encoder_args:
+        voxel_size: *voxel_size_m2
+        lidar_range: *cav_lidar_m2
+        mean_vfe:
+          num_point_features: 4
+        spconv:
+          num_features_in: 4
+          num_features_out: 64
+        map2bev:
+          feature_num: 128
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [1] # Note here for Second, this is set to be 1 not 2.
+        num_filters: [64]
+        inplanes: 128
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m2
+      dir_args: *dir_args_m2
+
+    m9:
+      core_method: *core_method_m9
+      sensor_type: *sensor_type_m9
+      lidar_range: *cav_lidar_m9
+
+      encoder_args:
+        voxel_size: *voxel_size_m9
+        lidar_range: *cav_lidar_m9
+        mean_vfe:
+          num_point_features: 4
+        spconv_large:
+          num_features_in: 4
+          num_features_out: 64
+        map2bev:
+          feature_num: 128
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [1] # Note here for Second, this is set to be 1 not 2.
+        num_filters: [64]
+        inplanes: 128
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m9
+      dir_args: *dir_args_m9
+
+    m5:
+      core_method: *core_method_m5
+      sensor_type: *sensor_type_m5
+      lidar_range: *cav_lidar_m5
+
+
+      encoder_args:
+        voxel_size: *voxel_size_m5
+        lidar_range: *cav_lidar_m5
+        pillar_vfe:
+          use_norm: true
+          with_distance: false
+          use_absolute_xyz: true
+          num_filters: [64]
+        cml_type: normal
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [2]
+        num_filters: [64]
+        inplanes: 128
+
+      aligner_args:
+        core_method: identity
+
+
+
+      in_head: 256
+      anchor_number: *anchor_num_m5
+      dir_args: *dir_args_m5
+
+    m11:
+      core_method: *core_method_m11
+      sensor_type: *sensor_type_m11
+      lidar_range: *cav_lidar_m11
+
+      # todo:这里需要改
+      encoder_args:
+        voxel_size: *voxel_size_m11
+        lidar_range: *cav_lidar_m11
+        pillar_vfe:
+          use_norm: true
+          with_distance: false
+          use_absolute_xyz: true
+          num_filters: [64]
+        cml_type: large
+
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [2]
+        num_filters: [64]
+        inplanes: 128
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m11
+      dir_args: *dir_args_m11
+
+    m12:
+      core_method: *core_method_m12
+      sensor_type: *sensor_type_m12
+      lidar_range: *cav_lidar_m12
+
+      encoder_args:
+        voxel_size: *voxel_size_m12
+        lidar_range: *cav_lidar_m12
+        pillar_vfe:
+          use_norm: true
+          with_distance: false
+          use_absolute_xyz: true
+          num_filters: [64]
+        point_pillar_scatter:
+          num_features: 64
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [1]
+        num_filters: [64]
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m12
+      dir_args: *dir_args_m12
+
+    m14:
+      core_method: *core_method_m14
+      sensor_type: *sensor_type_m14
+      lidar_range: *cav_lidar_m14
+
+      encoder_args:
+        voxel_size: *voxel_size_m14
+        lidar_range: *cav_lidar_m14
+        pillar_vfe:
+          use_norm: true
+          with_distance: false
+          use_absolute_xyz: true
+          num_filters: [64, 64, 64]
+        point_pillar_scatter:
+          num_features: 64
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [1]
+        num_filters: [64]
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m14
+      dir_args: *dir_args_m14
+
+    m15:
+      core_method: *core_method_m15
+      sensor_type: *sensor_type_m15
+      lidar_range: *cav_lidar_m15
+
+      encoder_args:
+        voxel_size: *voxel_size_m15
+        lidar_range: *cav_lidar_m15
+        mean_vfe:
+          num_point_features: 4
+        spconv_4x:
+          num_features_in: 4
+          num_features_out: 64
+        map2bev:
+          feature_num: 128
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [1] # Note here for Second, this is set to be 1 not 2.
+        num_filters: [64]
+        inplanes: 128
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m15
+      dir_args: *dir_args_m15
+    m17:
+      core_method: *core_method_m17
+      sensor_type: *sensor_type_m17
+      lidar_range: *cav_lidar_m17
+
+      encoder_args:
+        voxel_size: *voxel_size_m17
+        lidar_range: *cav_lidar_m17
+        mean_vfe:
+          num_point_features: 4
+        spconv_4x_large:
+          num_features_in: 4
+          num_features_out: 64
+        map2bev:
+          feature_num: 128
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [1] # Note here for Second, this is set to be 1 not 2.
+        num_filters: [64]
+        inplanes: 128
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m17
+      dir_args: *dir_args_m17
+    m6:
+      core_method: *core_method_m6
+      sensor_type: *sensor_type_m6
+      lidar_range: *cav_lidar_m6
+
+      encoder_args:
+        voxel_size: *voxel_size_m6
+        lidar_range: *cav_lidar_m6
+        pillar_vfe:
+          use_norm: true
+          with_distance: false
+          use_absolute_xyz: true
+          num_filters: [64,64]
+        point_pillar_scatter:
+          num_features: 64
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [2]
+        num_filters: [64]
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m6
+      dir_args: *dir_args_m6
+    m8:
+      core_method: *core_method_m8
+      sensor_type: *sensor_type_m8
+      lidar_range: *cav_lidar_m8
+
+      encoder_args:
+        voxel_size: *voxel_size_m8
+        lidar_range: *cav_lidar_m8
+        mean_vfe:
+          num_point_features: 4
+        spconv_medium:
+          num_features_in: 4
+          num_features_out: 64
+        map2bev:
+          feature_num: 128
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [1] # Note here for Second, this is set to be 1 not 2.
+        num_filters: [64]
+        inplanes: 128
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m8
+      dir_args: *dir_args_m8
+    m10:
+      core_method: *core_method_m10
+      sensor_type: *sensor_type_m10
+      lidar_range: *cav_lidar_m10
+
+      # todo:这里需要改
+      encoder_args:
+        voxel_size: *voxel_size_m10
+        lidar_range: *cav_lidar_m10
+        pillar_vfe:
+          use_norm: true
+          with_distance: false
+          use_absolute_xyz: true
+          num_filters: [64]
+        cml_type: medium
+
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [2]
+        num_filters: [64]
+        inplanes: 128
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m10
+      dir_args: *dir_args_m10
+    m13:
+      core_method: *core_method_m13
+      sensor_type: *sensor_type_m13
+      lidar_range: *cav_lidar_m13
+
+      encoder_args:
+        voxel_size: *voxel_size_m13
+        lidar_range: *cav_lidar_m13
+        pillar_vfe:
+          use_norm: true
+          with_distance: false
+          use_absolute_xyz: true
+          num_filters: [64, 64]
+        point_pillar_scatter:
+          num_features: 64
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [1]
+        num_filters: [64]
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m13
+      dir_args: *dir_args_m13
+    m16:
+      core_method: *core_method_m16
+      sensor_type: *sensor_type_m16
+      lidar_range: *cav_lidar_m16
+
+      encoder_args:
+        voxel_size: *voxel_size_m16
+        lidar_range: *cav_lidar_m16
+        mean_vfe:
+          num_point_features: 4
+        spconv_4x_medium:
+          num_features_in: 4
+          num_features_out: 64
+        map2bev:
+          feature_num: 128
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [1] # Note here for Second, this is set to be 1 not 2.
+        num_filters: [64]
+        inplanes: 128
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m16
+      dir_args: *dir_args_m16
+    m24:
+      core_method: *core_method_m24
+      sensor_type: *sensor_type_m24
+      lidar_range: *cav_lidar_m24
+
+      encoder_args:
+        voxel_size: *voxel_size_m24
+        lidar_range: *cav_lidar_m24
+        mean_vfe:
+          num_point_features: 4
+        spconv_2x:
+          num_features_in: 4
+          num_features_out: 64
+          size: normal
+        map2bev:
+          feature_num: 128
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [1] # Note here for Second, this is set to be 1 not 2.
+        num_filters: [64]
+        inplanes: 128
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m24
+      dir_args: *dir_args_m24
+    m25:
+      core_method: *core_method_m25
+      sensor_type: *sensor_type_m25
+      lidar_range: *cav_lidar_m25
+
+      encoder_args:
+        voxel_size: *voxel_size_m25
+        lidar_range: *cav_lidar_m25
+        mean_vfe:
+          num_point_features: 4
+        spconv_2x:
+          num_features_in: 4
+          num_features_out: 64
+          size: medium
+        map2bev:
+          feature_num: 128
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [1] # Note here for Second, this is set to be 1 not 2.
+        num_filters: [64]
+        inplanes: 128
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m25
+      dir_args: *dir_args_m25
+    m26:
+      core_method: *core_method_m26
+      sensor_type: *sensor_type_m26
+      lidar_range: *cav_lidar_m26
+
+      encoder_args:
+        voxel_size: *voxel_size_m26
+        lidar_range: *cav_lidar_m26
+        mean_vfe:
+          num_point_features: 4
+        spconv_2x:
+          num_features_in: 4
+          num_features_out: 64
+          size: large
+        map2bev:
+          feature_num: 128
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [1] # Note here for Second, this is set to be 1 not 2.
+        num_filters: [64]
+        inplanes: 128
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m26
+      dir_args: *dir_args_m26
+    m18:
+      core_method: *core_method_m18
+      sensor_type: *sensor_type_m18
+      lidar_range: *cav_lidar_m18
+
+      encoder_args:
+        voxel_size: *voxel_size_m18
+        lidar_range: *cav_lidar_m18
+        pillar_vfe:
+          use_norm: true
+          with_distance: false
+          use_absolute_xyz: true
+          num_filters: [64]
+        point_pillar_scatter:
+          num_features: 64
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [4]
+        num_filters: [64]
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m18
+      dir_args: *dir_args_m18
+    m19:
+      core_method: *core_method_m19
+      sensor_type: *sensor_type_m19
+      lidar_range: *cav_lidar_m19
+
+      encoder_args:
+        voxel_size: *voxel_size_m19
+        lidar_range: *cav_lidar_m19
+        pillar_vfe:
+          use_norm: true
+          with_distance: false
+          use_absolute_xyz: true
+          num_filters: [64, 64]
+        point_pillar_scatter:
+          num_features: 64
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [4]
+        num_filters: [64]
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m19
+      dir_args: *dir_args_m19
+    m20:
+      core_method: *core_method_m20
+      sensor_type: *sensor_type_m20
+      lidar_range: *cav_lidar_m20
+
+      encoder_args:
+        voxel_size: *voxel_size_m20
+        lidar_range: *cav_lidar_m20
+        pillar_vfe:
+          use_norm: true
+          with_distance: false
+          use_absolute_xyz: true
+          num_filters: [64, 64, 64]
+        point_pillar_scatter:
+          num_features: 64
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [4]
+        num_filters: [64]
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m20
+      dir_args: *dir_args_m20
+    m30:
+      core_method: *core_method_m30
+      sensor_type: *sensor_type_m30
+      lidar_range: *cav_lidar_m30
+
+      encoder_args:
+        voxel_size: *voxel_size_m30
+        lidar_range: *cav_lidar_m30
+        pillar_vfe:
+          use_norm: true
+          with_distance: false
+          use_absolute_xyz: true
+          num_filters: [64]
+        cml_type: normal
+
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [1]
+        num_filters: [64]
+        inplanes: 128
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m30
+      dir_args: *dir_args_m30
+    m31:
+      core_method: *core_method_m31
+      sensor_type: *sensor_type_m31
+      lidar_range: *cav_lidar_m31
+
+      # todo:这里需要改
+      encoder_args:
+        voxel_size: *voxel_size_m31
+        lidar_range: *cav_lidar_m31
+        pillar_vfe:
+          use_norm: true
+          with_distance: false
+          use_absolute_xyz: true
+          num_filters: [64]
+        cml_type: medium
+
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [1]
+        num_filters: [64]
+        inplanes: 128
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m31
+      dir_args: *dir_args_m31
+    m32:
+      core_method: *core_method_m32
+      sensor_type: *sensor_type_m32
+      lidar_range: *cav_lidar_m32
+
+      # todo:这里需要改
+      encoder_args:
+        voxel_size: *voxel_size_m32
+        lidar_range: *cav_lidar_m32
+        pillar_vfe:
+          use_norm: true
+          with_distance: false
+          use_absolute_xyz: true
+          num_filters: [64]
+        cml_type: large
+
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [1]
+        num_filters: [64]
+        inplanes: 128
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m32
+      dir_args: *dir_args_m32
+    m1:
+      core_method: *core_method_m1
+      sensor_type: *sensor_type_m1
+      lidar_range: &cav_lidar_m1 [-51.2, -51.2, -3, 51.2, 51.2, 1] # Needs to define here, because camera does not have lidar_range defined in preprocessing. But we need this information to crop feature
+
+      encoder_args:
+        anchor_number: *anchor_num_m1
+        grid_conf: *grid_conf_m1
+        data_aug_conf: *data_aug_conf_m1
+        img_downsample: 8
+        img_features: 128
+        use_depth_gt: false
+        depth_supervision: false
+        camera_encoder: EfficientNet
+
+      camera_mask_args:
+        cav_lidar_range: *cav_lidar_m1
+        grid_conf: *grid_conf_m1
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [2]
+        num_filters: [64]
+        inplanes: 128
+
+      aligner_args:
+        core_method: identity
+
+      fusion_method: pyramid
+
+      fusion_backbone:
+        resnext: true
+        layer_nums: [3, 5, 8]
+        layer_strides: [1, 2, 2]
+        num_filters: [64, 128, 256]
+        upsample_strides: [1, 2, 4]
+        num_upsample_filter: [128, 128, 128]
+        anchor_number: *anchor_num_m1
+
+      shrink_header:
+        kernal_size: [ 3 ]
+        stride: [ 1 ]
+        padding: [ 1 ]
+        dim: [ 256 ]
+        input_dim: 384 # 128 * 3
+
+
+      in_head: 256
+      anchor_number: *anchor_num_m1
+      dir_args: *dir_args_m1
+    m3:
+      core_method: *core_method_m3
+      sensor_type: *sensor_type_m3
+      lidar_range: &cav_lidar_m3 [-51.2, -51.2, -3, 51.2, 51.2, 1]  # Needs to define here, because camera does not have lidar_range defined in preprocessing. But we need this information to crop feature
+
+      encoder_args:
+        anchor_number: *anchor_num_m3
+        grid_conf: *grid_conf_m3
+        data_aug_conf: *data_aug_conf_m3
+        img_downsample: 8
+        img_features: 128
+        use_depth_gt: false
+        depth_supervision: false
+        camera_encoder: Resnet101
+
+      camera_mask_args:
+        cav_lidar_range: *cav_lidar_m3
+        grid_conf: *grid_conf_m3
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [2]
+        num_filters: [64]
+        inplanes: 128
+
+      aligner_args:
+        core_method: identity
+
+      fusion_method: pyramid
+
+      fusion_backbone:
+        resnext: true
+        layer_nums: [ 3, 5, 8 ]
+        layer_strides: [ 1, 2, 2 ]
+        num_filters: [ 64, 128, 256 ]
+        upsample_strides: [ 1, 2, 4 ]
+        num_upsample_filter: [ 128, 128, 128 ]
+        anchor_number: *anchor_num_m3
+
+      shrink_header:
+        kernal_size: [ 3 ]
+        stride: [ 1 ]
+        padding: [ 1 ]
+        dim: [ 256 ]
+        input_dim: 384 # 128 * 3
+
+      in_head: 256
+      anchor_number: *anchor_num_m3
+      dir_args: *dir_args_m3
+    m36:
+      core_method: *core_method_m36
+      sensor_type: *sensor_type_m36
+      lidar_range: &cav_lidar_m36 [-51.2, -51.2, -3, 51.2, 51.2, 1] # Needs to define here, because camera does not have lidar_range defined in preprocessing. But we need this information to crop feature
+
+      encoder_args:
+        anchor_number: *anchor_num_m36
+        grid_conf: *grid_conf_m36
+        data_aug_conf: *data_aug_conf_m36
+        img_downsample: 8
+        img_features: 128
+        use_depth_gt: false
+        depth_supervision: false
+        camera_encoder: EfficientNetB1
+
+      camera_mask_args:
+        cav_lidar_range: *cav_lidar_m36
+        grid_conf: *grid_conf_m36
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [2]
+        num_filters: [64]
+        inplanes: 128
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m36
+      dir_args: *dir_args_m36
+    m37:
+      core_method: *core_method_m37
+      sensor_type: *sensor_type_m37
+      lidar_range: &cav_lidar_m37 [-51.2, -51.2, -3, 51.2, 51.2, 1]  # Needs to define here, because camera does not have lidar_range defined in preprocessing. But we need this information to crop feature
+
+      encoder_args:
+        anchor_number: *anchor_num_m37
+        grid_conf: *grid_conf_m37
+        data_aug_conf: *data_aug_conf_m37
+        img_downsample: 8
+        img_features: 128
+        use_depth_gt: false
+        depth_supervision: false
+        camera_encoder: Resnet34
+
+      camera_mask_args:
+        cav_lidar_range: *cav_lidar_m37
+        grid_conf: *grid_conf_m37
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [2]
+        num_filters: [64]
+        inplanes: 128
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m37
+      dir_args: *dir_args_m37
+    m38:
+      core_method: *core_method_m38
+      sensor_type: *sensor_type_m38
+      lidar_range: &cav_lidar_m38 [-51.2, -51.2, -3, 51.2, 51.2, 1] # Needs to define here, because camera does not have lidar_range defined in preprocessing. But we need this information to crop feature
+
+      encoder_args:
+        anchor_number: *anchor_num_m38
+        grid_conf: *grid_conf_m38
+        data_aug_conf: *data_aug_conf_m38
+        img_downsample: 8
+        img_features: 128
+        use_depth_gt: false
+        depth_supervision: false
+        camera_encoder: EfficientNetB2
+
+      camera_mask_args:
+        cav_lidar_range: *cav_lidar_m38
+        grid_conf: *grid_conf_m38
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [2]
+        num_filters: [64]
+        inplanes: 128
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m38
+      dir_args: *dir_args_m38
+    m39:
+      core_method: *core_method_m39
+      sensor_type: *sensor_type_m39
+      lidar_range: &cav_lidar_m39 [-51.2, -51.2, -3, 51.2, 51.2, 1]  # Needs to define here, because camera does not have lidar_range defined in preprocessing. But we need this information to crop feature
+
+      encoder_args:
+        anchor_number: *anchor_num_m39
+        grid_conf: *grid_conf_m39
+        data_aug_conf: *data_aug_conf_m39
+        img_downsample: 8
+        img_features: 128
+        use_depth_gt: false
+        depth_supervision: false
+        camera_encoder: Resnet50
+
+      camera_mask_args:
+        cav_lidar_range: *cav_lidar_m39
+        grid_conf: *grid_conf_m39
+
+      backbone_args:
+        layer_nums: [3]
+        layer_strides: [2]
+        num_filters: [64]
+        inplanes: 128
+
+      aligner_args:
+        core_method: identity
+
+      in_head: 256
+      anchor_number: *anchor_num_m39
+      dir_args: *dir_args_m39
+
+
+
+
+#loss_moe:
+#  core_method: moe_loss
+#  args:
+#    alpha_N2E: 15.0
+#    alpha_P2M: 9.0
+#    alpha_M2P2M: 1.0
+#    alpha_M2P: 10.0
+
+
+#loss:
+#  core_method: moe_loss
+#  args:
+#    w_N2E: 10.0                  # maps to self.w_N2E
+#    w_gram: 10.0                 # gram loss
+#    alpha_mass_target: 0.85    # target total mass for active experts
+#    alpha_cap_max: 0.55        # per-expert max alpha
+#    alpha_tau: 0.2             # InfoNCE temperature
+#    alpha_apply_softmax: true  # if alphas are logits; set false to disable softmax
+#    top_k: 3                   # top-k experts
+#    # Weights for alpha-related regularizers
+#    w_alpha_mass: 1.0
+#    w_alpha_effnum: 0.5
+#    w_alpha_maxcap: 1.0
+#    w_alpha_balance: 1.0
+#    w_alpha_z: 0.1
+#    w_alpha_contrast: 2.0
+#    # Overall weight for SoE alpha regularization
+#    w_alpha_total: 1.0
+#    w_alpha_stop_ep: 50
+
+
+loss:
+  core_method: unitrans_loss
+  args:
+    w_detection_total: 2
+    pos_cls_weight: 2.0
+    cls:
+      type: 'SigmoidFocalLoss'
+      alpha: 0.25
+      gamma: 2.0
+      weight: 2.0
+    reg:
+      type: 'WeightedSmoothL1Loss'
+      sigma: 3.0
+      codewise: true
+      weight: 2.0
+    dir:
+      type: 'WeightedSoftmaxClassificationLoss'
+      weight: 0.2
+      args: *dir_args_m12
+    depth:
+      weight: 1.0
+    pyramid:
+      relative_downsample: [1, 2, 4]
+      weight: [0.4, 0.2, 0.1]
+    converter:
+      w_N2E: 5    # maps to self.w_N2E
+      w_gram: 50                  # gram loss
+      w_gram_warmup_steps: 200    # RampUpWeight warmup steps (optional)
+
+      # -------- Router / alpha settings --------
+      top_k: *top_k               # top-k experts
+
+      # alphas are logits -> convert to simplex probs
+      alpha_apply_softmax: true
+      alpha_softmax_tau: 1      # softmax temperature (smaller -> sharper routing)
+
+      # contrastive temperature (InfoNCE)
+      alpha_tau: 0.2
+
+      # alpha shape regularization (encourage top-k concentration + avoid single expert collapse)
+      alpha_mass_target: 0.8     # target probability mass carried by top-k experts
+      alpha_cap_max: 0.7         # max probability for any single expert
+
+      # -------- Weights for alpha regularizers --------
+      w_alpha_mass: 0.5           # top-k mass loss weight
+      w_alpha_effnum: 0.1        # effective-number loss weight (~K)
+      w_alpha_maxcap: 0.1         # max-cap hinge weight
+      w_alpha_lb: 0.5             # Switch-style importance x load (global in DDP)
+      w_alpha_z: 0.01           # z-loss: (logsumexp(logits))^2
+      w_alpha_contrast: 0.5       # contrastive on A_prob (DDP global bank)
+
+      # -------- Overall alpha regularization --------
+      w_alpha_total: 0.1
+      w_alpha_stop_ep: 400
+
+
+
+
+
+optimizer:
+  core_method: Adam
+  lr: 0.001
+  args:
+    eps: 1e-10
+    weight_decay: 1e-4
+
+lr_scheduler:
+  core_method: multistep #step, multistep and Exponential support
+  gamma: 0.1
+  step_size: [30, 50, 100]
+
+

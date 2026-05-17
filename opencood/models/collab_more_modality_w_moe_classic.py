@@ -1,0 +1,955 @@
+# -*- coding: utf-8 -*-
+# Author: Xiangbo Gao <xiangbogaobarry@gmail.com>
+# License: MIT License
+
+import torch
+import cv2
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+import numpy as np
+from icecream import ic
+from collections import OrderedDict, Counter
+from opencood.models.sub_modules.base_bev_backbone_resnet import ResNetBEVBackbone
+from opencood.models.sub_modules.feature_alignnet import AlignNet
+from opencood.models.sub_modules.downsample_conv import DownsampleConv
+from opencood.models.sub_modules.naive_compress import NaiveCompressor
+from opencood.models.fuse_modules.pyramid_fuse import PyramidFusion
+from opencood.models.fuse_modules.adapter import Adapter, Reverter
+from opencood.models.sub_modules.torch_transformation_utils import warp_affine_simple
+from opencood.utils.transformation_utils import normalize_pairwise_tfm
+from opencood.models.sub_modules.translators import build_feature_converter
+from opencood.models.fuse_modules.fusion_in_one import (
+    MaxFusion,
+    AttFusion,
+    DiscoFusion,
+    V2VNetFusion,
+    V2XViTFusion,
+    CoBEVT,
+    Where2commFusion,
+    Who2comFusion,
+)
+
+from opencood.models.fuse_modules.fusion_in_one import regroup
+
+from opencood.models.sub_modules.naive_decoder import NaiveDecoder
+from opencood.models.sub_modules.bev_seg_head import BevSegHead
+from opencood.utils.model_utils import check_trainable_module, fix_bn, unfix_bn
+
+import importlib
+import torchvision
+
+
+from opencood.models.mpda_modules.classfier import DAImgHead
+from opencood.models.mpda_modules.resizer import LearnableResizer
+from opencood.models.mpda_modules.wg_fusion_modules import CrossDomainFusionEncoder
+
+
+
+class CollabMoreModalityWMoEClassic(nn.Module):
+
+    def __init__(self, args):
+        super(CollabMoreModalityWMoEClassic, self).__init__()
+
+        self.converter = build_feature_converter(args["converter"])
+
+        self.unfix_modules = [self.converter]
+
+
+        self.args = args
+        self.crop_to_visible = args.get("crop_to_visible", False)
+
+        self.testing = args.get("testing", False)
+
+        inference_modality = set(args.get("ignored_modality", []))
+        ignored_modality = []
+        if not self.testing:
+            ignored_modality = inference_modality
+            inference_modality = []
+
+        mods = [
+            k for k in args.keys() if k not in ignored_modality and k.startswith("m") and k[1:].isdigit()
+        ]
+        # stable sort (for ddp)：m0, m1, m2, ...
+        mods = sorted(mods, key=lambda s: int(s[1:]))
+        self.modality_name_list = mods
+
+
+
+        all_mods = [
+            k for k in args.keys() if k.startswith("m") and k[1:].isdigit()
+        ]
+        # stable sort (for ddp)：m0, m1, m2, ...
+        all_mods = sorted(all_mods, key=lambda s: int(s[1:]))
+        self.all_modality_name_list = all_mods
+
+
+
+        self.ego_modality_name = args["ego_modality"]
+        self.ego_modality_setting= args[self.ego_modality_name]
+        self.sensor_type_dict = OrderedDict()
+        self.cam_crop_info = {}
+
+        # setup each modality model
+        for modality_name in self.all_modality_name_list:
+            model_setting = args[modality_name]
+            setattr(self, f"cav_range_{modality_name}", model_setting["lidar_range"])
+            setattr(
+                self, f"visible_range_{modality_name}", model_setting.get("visible_range", model_setting["lidar_range"])
+            )
+
+            self.build_encoder(modality_name, model_setting)
+            self.build_backbone(modality_name, model_setting)
+            self.build_aligner(modality_name, model_setting)
+
+            """For feature transformation"""
+            setattr(
+                self,
+                f"H_{modality_name}",
+                (eval(f"self.cav_range_{modality_name}")[4] - eval(f"self.cav_range_{modality_name}")[1]),
+            )
+            setattr(
+                self,
+                f"W_{modality_name}",
+                (eval(f"self.cav_range_{modality_name}")[3] - eval(f"self.cav_range_{modality_name}")[0]),
+            )
+            self.fake_voxel_size = 1
+
+            # # only build for ego modality
+            # if modality_name == self.ego_modality_name:
+
+            try:
+                self.build_fusion(modality_name, model_setting)
+                self.build_shrink_header(modality_name, model_setting)
+                self.build_head(modality_name, model_setting)
+            except:
+                self.build_fusion(modality_name, self.ego_modality_setting)
+                self.build_shrink_header(modality_name, self.ego_modality_setting)
+                self.build_head(modality_name, self.ego_modality_setting)
+
+
+
+
+        self.model_train_init()
+        # check again which module is not fixed.
+        check_trainable_module(self)
+
+        self.testing = False
+
+
+
+    def model_train_init(self):
+        for p in self.parameters():
+            p.requires_grad_(False)
+        self.apply(fix_bn)
+
+        for mm in self.unfix_modules:
+            for p in mm.parameters():
+                p.requires_grad_(True)
+            mm.apply(unfix_bn)
+
+
+
+
+
+
+    def forward(self, data_dict, show_bev=False):
+        agent_modality_list = data_dict["agent_modality_list"]
+        print(f'\nagent_modality_list:{agent_modality_list}')
+        # print(f'self.modality_name_list:{self.modality_name_list}')
+        record_len = data_dict["record_len"]
+        print(f"{sum(record_len)=}")
+
+        # Filter out the modality that is not ready for inference
+        pairwise_t_matrix = data_dict["pairwise_t_matrix"]
+        pairwise_t_matrix_new = torch.zeros_like(pairwise_t_matrix)
+        agent_modality_list_filtered = []
+        record_len_filtered = []
+        cur = 0
+        count = 0
+        ptr = 0
+        indices = []
+        for m in agent_modality_list:
+            if m in self.modality_name_list:
+                agent_modality_list_filtered.append(m)
+                count += 1
+                indices.append(cur)
+            cur += 1
+            if record_len[ptr] == cur:
+                record_len_filtered.append(count)
+                if len(indices) > 0:
+                    for i in range(len(indices)):
+                        for j in range(len(indices)):
+                            pairwise_t_matrix_new[ptr][i][j] = pairwise_t_matrix[ptr][indices[i]][indices[j]]
+                cur = 0
+                count = 0
+                ptr += 1
+                indices = []
+
+        pairwise_t_matrix = pairwise_t_matrix_new
+        record_len = torch.tensor(record_len_filtered, device=record_len.device)
+        agent_modality_list = agent_modality_list_filtered
+
+        used_modalities = []
+        for modality in agent_modality_list:
+            if modality in self.modality_name_list and modality not in used_modalities:
+                used_modalities.append(modality)
+        self.used_modality_name_list = used_modalities
+        # print(f'self.used_modality_name_list:{self.used_modality_name_list}')
+        output_dict = {}
+        output_dict.update({"pyramid": "collab"})
+
+
+
+        batch_ego_modality_list = []
+        start = 0
+        for mini_batch_idx, mini_batch_size in enumerate(record_len):
+            batch_ego_modality_list.append(agent_modality_list[start])
+            start += mini_batch_size
+
+
+
+        modality_count_dict = Counter(agent_modality_list)
+        modality_feature_dict = {}
+        with torch.no_grad():  #
+            # setup each modality model
+            for modality_name in self.used_modality_name_list:
+                # print(f'modality_name{modality_name}')
+                if modality_name not in modality_count_dict:
+                    continue
+
+                feature = self.forward_encoder(data_dict, modality_name, output_dict)
+                feature = self.forward_backbone(feature, modality_name)
+                feature = self.forward_aligner(feature, modality_name)
+
+                modality_feature_dict[modality_name] = feature
+
+
+                if not eval(f"self.multi_sensor_{modality_name}"):
+                    """
+                    Crop/Padd camera feature map.
+                    """
+                    if "camera" in self.sensor_type_dict[modality_name]:
+                        feature = modality_feature_dict[modality_name]
+                        _, _, H, W = feature.shape
+                        target_H = int(H * eval(f"self.crop_ratio_H_{modality_name}"))
+                        target_W = int(W * eval(f"self.crop_ratio_W_{modality_name}"))
+
+                        crop_func = torchvision.transforms.CenterCrop((target_H, target_W))
+                        modality_feature_dict[modality_name] = crop_func(feature)
+                        if eval(f"self.depth_supervision_{modality_name}"):
+                            output_dict[modality_name].update(
+                                {f"depth_items_{modality_name}": eval(f"self.encoder_{modality_name}").depth_items}
+                            )
+
+            if not self.testing:
+                # if self.training or self.converter.training:
+                # For ego modality
+
+                if isinstance(data_dict["inputs_ego"], list):
+                    all_processed_features_gt = []
+                    inputs_ego_list = data_dict["inputs_ego"]
+
+                    for i in range (len(inputs_ego_list)):
+                        batch_inputs = inputs_ego_list[i]
+                        batch_modality_gt = batch_ego_modality_list[i]
+                        data_dict_tmp = {f"inputs_{batch_modality_gt}": batch_inputs}
+                        feature_ego = self.forward_encoder(data_dict_tmp, batch_modality_gt, {})
+                        feature_ego = self.forward_backbone(feature_ego, batch_modality_gt)
+                        FE = self.forward_aligner(feature_ego, batch_modality_gt)
+
+                        if not eval(f"self.multi_sensor_{batch_modality_gt}"):
+                            """
+                            Crop/Padd camera feature map.
+                            """
+                            if "camera" in self.sensor_type_dict[batch_modality_gt]:
+                                feature = FE
+                                _, _, H, W = feature.shape
+                                target_H = int(H * eval(f"self.crop_ratio_H_{batch_modality_gt}"))
+                                target_W = int(W * eval(f"self.crop_ratio_W_{batch_modality_gt}"))
+
+                                crop_func = torchvision.transforms.CenterCrop((target_H, target_W))
+                                FE = crop_func(feature)
+                                if eval(f"self.depth_supervision_{batch_modality_gt}"):
+                                    output_dict[modality_name].update(
+                                        {f"depth_items_{batch_modality_gt}": eval(
+                                            f"self.encoder_{batch_modality_gt}").depth_items}
+                                    )
+
+                        all_processed_features_gt.append(FE)
+                    FE = torch.cat(all_processed_features_gt, dim=0)
+
+                else:
+                    feature_ego = self.forward_encoder(data_dict, "ego", output_dict)
+                    feature_ego = self.forward_backbone(feature_ego, self.ego_modality_name)
+                    FE = self.forward_aligner(feature_ego, self.ego_modality_name)
+
+                    if not eval(f"self.multi_sensor_{self.ego_modality_name}"):
+                        """
+                        Crop/Padd camera feature map.
+                        """
+                        if "camera" in self.sensor_type_dict[self.ego_modality_name]:
+                            feature = FE
+                            _, _, H, W = feature.shape
+                            target_H = int(H * eval(f"self.crop_ratio_H_{self.ego_modality_name}"))
+                            target_W = int(W * eval(f"self.crop_ratio_W_{self.ego_modality_name}"))
+
+                            crop_func = torchvision.transforms.CenterCrop((target_H, target_W))
+                            FE = crop_func(feature)
+                            if eval(f"self.depth_supervision_{self.ego_modality_name}"):
+                                output_dict[self.ego_modality_name].update(
+                                    {f"depth_items_{self.ego_modality_name}": eval(
+                                        f"self.encoder_{self.ego_modality_name}").depth_items}
+                                )
+
+                output_dict.update({
+                    "FE": FE,
+                })
+
+
+
+
+        """
+        Assemble heter features
+        """
+
+
+        modality_name = self.ego_modality_name
+
+        affine_matrix = normalize_pairwise_tfm(
+            pairwise_t_matrix,
+            eval(f"self.H_{modality_name}"),
+            eval(f"self.W_{modality_name}"),
+            self.fake_voxel_size,
+        )
+
+        counting_dict = {modality_name:0 for modality_name in self.modality_name_list}
+        heter_feature_2d_list = []
+        for modality_name in agent_modality_list:
+            feat_idx = counting_dict[modality_name]
+            heter_feature_2d_list.append(modality_feature_dict[modality_name][feat_idx])
+            counting_dict[modality_name] += 1
+
+        heter_feature_2d = torch.stack(heter_feature_2d_list)
+
+        ######feture converter########
+        heter_feature_split = regroup(heter_feature_2d, record_len)
+        heter_feature_2d_list = []
+
+        for mini_batch_idx, mini_batch_size in enumerate(record_len):
+            batch_feature = heter_feature_split[mini_batch_idx]
+            _, _, H, W = batch_feature.shape
+
+            ego_feat = batch_feature[0:1]
+            ## 将ego特征转换到neb坐标系下
+            t_matrix = affine_matrix[mini_batch_idx][:mini_batch_size, :mini_batch_size, :, :]
+            ego_repeat = ego_feat.repeat(batch_feature.shape[0], 1, 1, 1)
+            ego_in_nebcoord = warp_affine_simple(ego_repeat, t_matrix[:, 0, :, :], (H, W), align_corners=True)
+            batch_feature_output = self.converter(ego_in_nebcoord, batch_feature)
+            if self.testing:
+                batch_feature_output[0:1] = ego_feat
+
+            heter_feature_2d_list.append(batch_feature_output)
+
+
+
+
+        # for i in range(len(heter_feature_split)):
+        #
+        #
+        #     ego_feature = heter_feature_split[i][0].unsqueeze(0)
+        #     if heter_feature_split[i].shape[0] == 1:  # only ego
+        #         if not self.testing:
+        #             ego_mapped = self.converter(ego_feature, ego_feature)
+        #             heter_feature_2d_list.append(ego_mapped)
+        #         else:
+        #             heter_feature_2d_list.append(ego_feature)
+        #     else:
+        #         cav_feature = heter_feature_split[i][1:]
+        #         ego_copy = ego_feature.repeat(cav_feature.shape[0], 1, 1, 1)
+        #         cav_feature = self.converter(ego_copy, cav_feature)
+        #         heter_feature_2d_list.append(torch.cat((ego_feature, cav_feature), dim=0))
+
+
+
+        heter_feature_2d_list = torch.cat(heter_feature_2d_list, dim=0)
+
+        output_dict.update({
+            "FN2E": heter_feature_2d_list,
+            "feat_vis": {
+                "record_len": record_len,
+                "raw": heter_feature_2d,
+                "processed": heter_feature_2d_list,
+            }
+        })
+
+        # heter_feature_2d_list_dict[modality_name] is downsampled 2x
+        # add croping information to collaboration module
+        fused_feature = self.forward_fusion(
+            heter_feature_2d_list,
+            pairwise_t_matrix,
+            self.ego_modality_name,
+            record_len,
+            agent_modality_list,
+            output_dict,
+        )
+
+        fused_feature = self.forward_shrink(fused_feature, self.ego_modality_name)
+
+
+
+        self.forward_head(fused_feature, self.ego_modality_name, output_dict)
+
+
+
+        return output_dict
+
+
+
+    def build_encoder(self, modality_name, model_setting):
+        """
+        Builds the encoder for a given modality.
+
+        Parameters:
+        - modality_name (str): The name of the modality (e.g., 'camera', 'lidar').
+        - model_setting (dict): Configuration settings for the model.
+
+        The function dynamically imports the encoder module, determines the type of encoder
+        (single sensor or multi-sensor), and sets appropriate attributes for the encoder.
+        """
+
+        encoder_filename = "opencood.models.heter_encoders"
+        encoder_lib = importlib.import_module(encoder_filename)
+        setattr(self, f"multi_sensor_{modality_name}", False)
+        if isinstance(model_setting["core_method"], str):
+            setattr(self, f"multi_sensor_{modality_name}", False)
+            target_model_name = model_setting["core_method"].replace("_", "")
+            for name, cls in encoder_lib.__dict__.items():
+                if name.lower() == target_model_name.lower():
+                    encoder_class = cls
+
+            assert model_setting.get("encoder_args", None), "encoder_args should be provided"
+            setattr(
+                self,
+                f"encoder_{modality_name}",
+                encoder_class(model_setting["encoder_args"]),
+            )
+            if model_setting["encoder_args"].get("depth_supervision", False):
+                setattr(self, f"depth_supervision_{modality_name}", True)
+            else:
+                setattr(self, f"depth_supervision_{modality_name}", False)
+
+        elif isinstance(model_setting["core_method"], dict):
+            setattr(self, f"multi_sensor_{modality_name}", True)
+            target_model_name_camera = model_setting["core_method"]["camera"].replace("_", "")
+            target_model_name_lidar = model_setting["core_method"]["lidar"].replace("_", "")
+            for name, cls in encoder_lib.__dict__.items():
+                if name.lower() == target_model_name_camera.lower():
+                    encoder_class_camera = cls
+                if name.lower() == target_model_name_lidar.lower():
+                    encoder_class_lidar = cls
+
+            assert model_setting.get("encoder_args_camera", None) and model_setting.get(
+                "encoder_args_lidar", None
+            ), "for multi_sensor, encoder_args_camera and encoder_args_lidar should be provided"
+            setattr(
+                self,
+                f"encoder_{modality_name}_camera",
+                encoder_class_camera(model_setting["encoder_args_camera"]),
+            )
+            setattr(
+                self,
+                f"encoder_{modality_name}_lidar",
+                encoder_class_lidar(model_setting["encoder_args_lidar"]),
+            )
+            if model_setting["encoder_args_camera"].get("depth_supervision", False):
+                setattr(self, f"depth_supervision_{modality_name}", True)
+            else:
+                setattr(self, f"depth_supervision_{modality_name}", False)
+
+    def build_backbone(self, modality_name, model_setting):
+        """
+        Builds the backbone for a given modality.
+
+        Parameters:
+        - modality_name (str): The name of the modality (e.g., 'camera', 'lidar').
+        - model_setting (dict): Configuration settings for the model.
+
+        This function sets up the backbone network if the necessary backbone arguments are provided.
+        """
+
+        self.backbone_flag = False
+        if model_setting.get("backbone_args", None):
+            self.backbone_flag = True
+            setattr(
+                self,
+                f"backbone_{modality_name}",
+                ResNetBEVBackbone(model_setting["backbone_args"]),
+            )
+
+    def build_aligner(self, modality_name, model_setting):
+        """
+        Builds the aligner for a given modality.
+
+        Parameters:
+        - modality_name (str): The name of the modality (e.g., 'camera', 'lidar').
+        - model_setting (dict): Configuration settings for the model.
+
+        This function sets up the aligner network and computes cropping ratios if the sensor type is a camera.
+        """
+
+        sensor_name = model_setting["sensor_type"]
+        self.sensor_type_dict[modality_name] = sensor_name
+        setattr(self, f"aligner_{modality_name}", AlignNet(model_setting["aligner_args"]))
+
+        if "camera" in sensor_name:
+            camera_mask_args = model_setting["camera_mask_args"]
+            setattr(
+                self,
+                f"crop_ratio_W_{modality_name}",
+                (eval(f"self.cav_range_{modality_name}")[3]) / (camera_mask_args["grid_conf"]["xbound"][1]),
+            )
+            setattr(
+                self,
+                f"crop_ratio_H_{modality_name}",
+                (eval(f"self.cav_range_{modality_name}")[4]) / (camera_mask_args["grid_conf"]["ybound"][1]),
+            )
+            setattr(
+                self,
+                f"xdist_{modality_name}",
+                (camera_mask_args["grid_conf"]["xbound"][1] - camera_mask_args["grid_conf"]["xbound"][0]),
+            )
+            setattr(
+                self,
+                f"ydist_{modality_name}",
+                (camera_mask_args["grid_conf"]["ybound"][1] - camera_mask_args["grid_conf"]["ybound"][0]),
+            )
+            self.cam_crop_info[modality_name] = {
+                f"crop_ratio_W_{modality_name}": eval(f"self.crop_ratio_W_{modality_name}"),
+                f"crop_ratio_H_{modality_name}": eval(f"self.crop_ratio_H_{modality_name}"),
+            }
+
+    def build_fusion(self, modality_name, model_setting):
+        """
+        Builds the fusion module for a given modality.
+
+        Parameters:
+        - modality_name (str): The name of the modality (e.g., 'camera', 'lidar').
+        - model_setting (dict): Configuration settings for the model.
+
+        This function sets up the fusion method based on the specified fusion method in the model settings.
+        """
+
+        """
+        Fusion, by default multiscale fusion:
+        Note the input of PyramidFusion has downsampled 2x. (SECOND required)
+        """
+
+        if model_setting["fusion_method"] == "max":
+            setattr(self, f"pyramid_backbone_{modality_name}", MaxFusion())
+        elif model_setting["fusion_method"] == "att":
+            setattr(
+                self,
+                f"pyramid_backbone_{modality_name}",
+                AttFusion(model_setting["fusion_backbone"]),
+            )
+        elif model_setting["fusion_method"] == "disconet":
+            setattr(
+                self,
+                f"pyramid_backbone_{modality_name}",
+                DiscoFusion(model_setting["fusion_backbone"]),
+            )
+        elif model_setting["fusion_method"] == "v2vnet":
+            setattr(
+                self,
+                f"pyramid_backbone_{modality_name}",
+                V2VNetFusion(model_setting["fusion_backbone"]),
+            )
+        elif model_setting["fusion_method"] == "v2xvit":
+            setattr(
+                self,
+                f"pyramid_backbone_{modality_name}",
+                V2XViTFusion(model_setting["fusion_backbone"]),
+            )
+        elif model_setting["fusion_method"] == "cobevt":
+            setattr(
+                self,
+                f"pyramid_backbone_{modality_name}",
+                CoBEVT(model_setting["fusion_backbone"]),
+            )
+        elif model_setting["fusion_method"] == "where2comm":
+            setattr(
+                self,
+                f"pyramid_backbone_{modality_name}",
+                Where2commFusion(model_setting["fusion_backbone"]),
+            )
+        elif model_setting["fusion_method"] == "who2com":
+            setattr(
+                self,
+                f"pyramid_backbone_{modality_name}",
+                Who2comFusion(model_setting["fusion_backbone"]),
+            )
+        elif model_setting["fusion_method"] == "pyramid":
+            setattr(
+                self,
+                f"pyramid_backbone_{modality_name}",
+                PyramidFusion(model_setting["fusion_backbone"]),
+            )
+        else:
+            raise NotImplementedError(f"Method {model_setting['fusion_method']} not implemented.")
+
+        if model_setting["fusion_method"] != "pyramid":
+            # other method does not have agent_modality_list and cam_crop_info, neither returning occ_single_list
+            pyramid_backbone = getattr(self, f"pyramid_backbone_{modality_name}")
+            pyramid_backbone.forward_collab = lambda *args: (
+                pyramid_backbone.forward(*args[:3]),
+                [],
+            )
+
+    def build_shrink_header(self, modality_name, model_setting):
+        """
+        Builds the shrink header for a given modality.
+
+        Parameters:
+        - modality_name (str): The name of the modality (e.g., 'camera', 'lidar').
+        - model_setting (dict): Configuration settings for the model.
+
+        This function sets up a downsample convolutional layer if the shrink header is specified.
+        """
+
+        setattr(self, f"shrink_flag_{modality_name}", False)
+        if "shrink_header" in model_setting:
+            setattr(self, f"shrink_flag_{modality_name}", True)
+            setattr(
+                self,
+                f"shrink_conv_{modality_name}",
+                DownsampleConv(model_setting["shrink_header"]),
+            )
+
+    def build_head(self, modality_name, model_setting):
+        """
+        Builds the head for a given modality.
+
+        Parameters:
+        - modality_name (str): The name of the modality (e.g., 'camera', 'lidar').
+        - model_setting (dict): Configuration settings for the model.
+
+        This function sets up the head network for various head methods such as object detection, segmentation, etc.
+        """
+
+        # By default, point pillar pyramid object detection head
+        head_method = model_setting.get("head_method", "point_pillar_pyramid_object_detection_head")
+        downsample_rate = model_setting.get("downsample_rate", 1)
+        setattr(self, f"head_method_{modality_name}", head_method)
+        setattr(self, f"downsample_rate_{modality_name}", downsample_rate)
+        # self.head_method = model_setting.get("head_method", "point_pillar_pyramid_object_detection_head")
+        # self.downsample_rate = model_setting.get("downsample_rate", 1)
+        if head_method == "point_pillar_pyramid_object_detection_head":
+
+            setattr(
+                self,
+                f"cls_head_{modality_name}",
+                nn.Conv2d(
+                    model_setting["in_head"],
+                    model_setting["anchor_number"],
+                    kernel_size=1,
+                ),
+            )
+            setattr(
+                self,
+                f"reg_head_{modality_name}",
+                nn.Conv2d(
+                    model_setting["in_head"],
+                    7 * model_setting["anchor_number"],
+                    kernel_size=1,
+                ),
+            )
+            if model_setting.get("dir_args", None):
+                setattr(
+                    self,
+                    f"dir_head_{modality_name}",
+                    nn.Conv2d(
+                        model_setting["in_head"],
+                        model_setting["dir_args"]["num_bins"] * model_setting["anchor_number"],
+                        kernel_size=1,
+                    ),
+                )
+
+        elif head_method == "point_pillar_object_detection_head":
+            setattr(
+                self,
+                f"cls_head_{modality_name}",
+                nn.Conv2d(model_setting["in_head"], 1, kernel_size=1),
+            )
+            setattr(
+                self,
+                f"reg_head_{modality_name}",
+                nn.Conv2d(model_setting["in_head"], 7, kernel_size=1),
+            )
+            if model_setting.get("dir_args", None):
+                setattr(
+                    self,
+                    f"dir_head_{modality_name}",
+                    nn.Conv2d(
+                        model_setting["in_head"],
+                        model_setting["dir_args"]["num_bins"],
+                        kernel_size=1,
+                    ),
+                )
+
+        elif head_method == "bev_seg_head":
+            setattr(
+                self,
+                f"head_{modality_name}",
+                nn.Sequential(
+                    NaiveDecoder(model_setting["decoder_args"]),
+                    BevSegHead(
+                        model_setting["target"],
+                        model_setting["seg_head_dim"],
+                        model_setting["output_class_dynamic"],
+                        model_setting["output_class_static"],
+                    ),
+                ),
+            )
+
+        elif head_method == "seg_head":
+            setattr(
+                self,
+                f"head_{modality_name}",
+                nn.Sequential(
+                    BevSegHead(
+                        model_setting["target"],
+                        model_setting["seg_head_dim"],
+                        model_setting["output_class_dynamic"],
+                        model_setting["output_class_static"],
+                    ),
+                ),
+            )
+
+        elif head_method == "pixor_head":
+
+            setattr(
+                self,
+                f"cls_head_{modality_name}",
+                nn.Conv2d(model_setting["in_head"], 1, kernel_size=1),
+            )
+            setattr(
+                self,
+                f"reg_head_{modality_name}",
+                nn.Conv2d(model_setting["in_head"], 6, kernel_size=1),
+            )
+
+        else:
+            raise NotImplementedError(f"Head method {head_method} not implemented.")
+
+    def build_compressor(self, modality_name, model_setting):
+        """
+        Builds the compressor for a given modality.
+        # compressor will be only trainable
+
+        Parameters:
+        - modality_name (str): The name of the modality (e.g., 'camera', 'lidar').
+        - model_setting (dict): Configuration settings for the model.
+
+        This function sets up the compressor module if the compressor settings are provided.
+        """
+
+        setattr(self, f"compress_{modality_name}", False)
+        if "compressor" in model_setting:
+            setattr(self, f"compress_{modality_name}", True)
+            setattr(
+                self,
+                f"compressor_{modality_name}",
+                NaiveCompressor(
+                    model_setting["compressor"]["input_dim"],
+                    model_setting["compressor"]["compress_ratio"],
+                ),
+            )
+
+
+
+    def forward_encoder(self, data_dict, modality_name, output_dict):
+        """
+        Forwards the input data through the encoder.
+        """
+        if modality_name == "ego":
+            feature = eval(f"self.encoder_{self.ego_modality_name}")(
+                data_dict, modality_name, False
+            )
+            return feature
+
+        if eval(f"self.multi_sensor_{modality_name}"):
+            feature_camera = eval(f"self.encoder_{modality_name}_camera")(
+                data_dict, modality_name, eval(f"self.multi_sensor_{modality_name}")
+            )
+
+            """
+            Crop/Padd camera feature map.
+
+            Parameters:
+            - data_dict (dict): Input data dictionary.
+            - modality_name (str): The name of the modality (e.g., 'camera', 'lidar').
+            - output_dict (dict): Output data dictionary.
+
+            Returns:
+            - feature (Tensor): Encoded features.
+            """
+
+            if "camera" in self.sensor_type_dict[modality_name]:
+                # should be padding. Instead of masking
+                _, _, H, W = feature_camera.shape
+                target_H = int(H * eval(f"self.crop_ratio_H_{modality_name}"))
+                target_W = int(W * eval(f"self.crop_ratio_W_{modality_name}"))
+
+                crop_func = torchvision.transforms.CenterCrop((target_H, target_W))
+                feature_camera = crop_func(feature_camera)
+                if eval(f"self.depth_supervision_{modality_name}"):
+                    output_dict.update(
+                        {f"depth_items_{modality_name}": eval(f"self.encoder_{modality_name}_camera").depth_items}
+                    )
+
+            feature_lidar = eval(f"self.encoder_{modality_name}_lidar")(
+                data_dict, modality_name, eval(f"self.multi_sensor_{modality_name}")
+            )
+
+            feature = feature_camera + feature_lidar
+        else:
+            feature = eval(f"self.encoder_{modality_name}")(
+                data_dict, modality_name, eval(f"self.multi_sensor_{modality_name}")
+            )
+        return feature
+
+    def forward_backbone(self, feature, modality_name):
+        """
+        Forwards the encoded feature through the backbone.
+
+        Parameters:
+        - feature (Tensor): Encoded features.
+        - modality_name (str): The name of the modality (e.g., 'camera', 'lidar').
+
+        Returns:
+        - feature (Tensor): Backbone features.
+        """
+
+        if self.backbone_flag:
+            feature = eval(f"self.backbone_{modality_name}")({"spatial_features": feature})["spatial_features_2d"]
+        return feature
+
+    def forward_aligner(self, feature, modality_name):
+        """
+        Forwards the feature through the aligner.
+
+        Parameters:
+        - feature (Tensor): Backbone features.
+        - modality_name (str): The name of the modality (e.g., 'camera', 'lidar').
+
+        Returns:
+        - feature (Tensor): Aligned features.
+        """
+
+        feature = eval(f"self.aligner_{modality_name}")(feature)
+        return feature
+
+    def forward_shrink(self, feature, modality_name):
+        """
+        Forwards the feature through the shrink header if available.
+
+        Parameters:
+        - feature (Tensor): Aligned features.
+        - modality_name (str): The name of the modality (e.g., 'camera', 'lidar').
+
+        Returns:
+        - feature (Tensor): Shrunken features.
+        """
+
+        if getattr(self, f"shrink_flag_{modality_name}"):
+            feature = eval(f"self.shrink_conv_{modality_name}")(feature)
+        return feature
+
+    def forward_compress(self, feature, modality_name):
+        """
+        Forwards the feature through the compressor if available.
+
+        Parameters:
+        - feature (Tensor): Shrunken features.
+        - modality_name (str): The name of the modality (e.g., 'camera', 'lidar').
+
+        Returns:
+        - feature (Tensor): Compressed features.
+        """
+
+        if getattr(self, f"compress_{modality_name}"):
+            feature = eval(f"self.compressor_{modality_name}")(feature)
+        return feature
+
+
+
+    def forward_fusion(
+            self,
+            feature,
+            pairwise_t_matrix,
+            modality_name,
+            record_len,
+            agent_modality_list,
+            output_dict,
+    ):
+        """
+        Forwards the feature through the fusion module.
+
+        Parameters:
+        - feature (Tensor): Compressed features.
+        - data_dict (dict): Input data dictionary.
+        - modality_name (str): The name of the modality (e.g., 'camera', 'lidar').
+        - record_len (int): Length of the record.
+        - agent_modality_list (list): List of agent modalities.
+        - output_dict (dict): Output data dictionary.
+
+        Returns:
+        - fused_feature (Tensor): Fused features.
+        """
+
+        affine_matrix = normalize_pairwise_tfm(
+            pairwise_t_matrix,
+            eval(f"self.H_{modality_name}"),
+            eval(f"self.W_{modality_name}"),
+            self.fake_voxel_size,
+        )
+
+        fused_feature, occ_outputs = eval(f"self.pyramid_backbone_{modality_name}").forward_collab(
+            feature,
+            record_len,
+            affine_matrix,
+            agent_modality_list,
+            self.cam_crop_info,
+            # transform_idx=0,
+        )
+
+        output_dict.update({"occ_single_list": occ_outputs})
+
+        return fused_feature
+
+    def forward_head(self, feature, modality_name, output_dict):
+        """
+        Forwards the feature through the head network.
+
+        Parameters:
+        - feature (Tensor): Fused features.
+        - modality_name (str): The name of the modality (e.g., 'camera', 'lidar').
+        - output_dict (dict): Output data dictionary.
+
+        This function handles the forward pass for different head methods such as object detection, segmentation, etc.
+        """
+
+        if eval(f"self.head_method_{modality_name}") in ["bev_seg_head", "seg_head"]:
+            output_dict.update(eval(f"self.head_{modality_name}")(feature))
+        else:
+            cls_preds = eval(f"self.cls_head_{modality_name}")(feature)
+            reg_preds = eval(f"self.reg_head_{modality_name}")(feature)
+            if hasattr(self, f"dir_head_{modality_name}"):
+                dir_preds = eval(f"self.dir_head_{modality_name}")(feature)
+            else:
+                dir_preds = None
+
+            output_dict.update({"cls_preds": cls_preds, "reg_preds": reg_preds, "dir_preds": dir_preds})
+
