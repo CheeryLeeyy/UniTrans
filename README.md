@@ -1,6 +1,6 @@
-# UniTrans
+# One Model to Translate Them All: Universal Any-to-Any Translation for Heterogeneous Collaborative Perception [ICML 2026]
 
-Official implementation of the ICML 2026 accepted paper **One Model to Translate Them All: Universal Any-to-Any Translation for Heterogeneous Collaborative Perception**.
+Official implementation of the ICML 2026 accepted paper **[ UniTrans ] One Model to Translate Them All: Universal Any-to-Any Translation for Heterogeneous Collaborative Perception**.
 
 UniTrans addresses feature-modality heterogeneity in intermediate-fusion collaborative perception. Instead of training a dedicated adapter for every source-target modality pair, UniTrans learns a modality-intrinsic latent space and instantiates mapping-conditioned feature translators from a reusable Translator Parameter Bank. This enables zero-shot any-to-any feature translation for newly emerging heterogeneous agents.
 
